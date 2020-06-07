@@ -1,11 +1,3 @@
-"""
-    Esqueleto para o EP2 de Cripto 2020
-    Prof. Routo Terada
-    Monitor: Thales Paiva
-
-    Para rodar:
-    [~/cripto-2020/ep1]$ sage ep1_esqueleto.py
-"""
 
 from sage.all import *
 
@@ -19,11 +11,6 @@ EC = EC.change_ring(GF(PRIME))
 POLY = EC.defining_polynomial()
 
 def MV_keygen(P):
-
-    # Calcula os valores:
-    #   public_key = (Q, P) \in E^2
-    #   secret_key = s tal que Q = sP
-    # P = EC.an_element()*30
     s = 10723944 % PRIME
     Q = s*P
     public_key = (P, Q)
@@ -38,8 +25,8 @@ def MV_encrypt(X, public_key):
     k = GF(PRIME).random_element()
     y0 = int(k) * public_key[0]
     (c1, c2, z) = int(k) * public_key[1]
-    y1 = c1*X[0] % PRIME
-    y2 = c2*X[1] % PRIME
+    y1 = (c1*X[0]) % PRIME
+    y2 = (c2*X[1]) % PRIME
 
     return (y0, y1, y2)
 
@@ -51,22 +38,19 @@ def correctBlockSize(message, n):
     message_bin = bin(message)[2:]
     size = len(message_bin)
     padding = n - size
-    # print("n, size, padding:", n, size,padding)
     message_bin = '0' * padding + message_bin
-    
     return message_bin
 
 def CBC_MV_encrypt(big_message, public_key):
-    big_message_int = int(big_message, 16)
-    big_message_bin = bin(big_message_int)[2:]
+    big_message_bin = big_message
     length = len(big_message_bin)
     rest = length % 16
+
     if rest != 0:
         padding = '0'*(16 - rest)
         big_message_bin = big_message_bin + padding 
 
     blocks = [big_message_bin[i:i+16] for i in range(0, length, 16)]
-    # last_block = [0,0]
     last_block = 0
     Y = []
     y0s = []
@@ -78,12 +62,19 @@ def CBC_MV_encrypt(big_message, public_key):
         x2 = int(x_with_block_size[8:], 2)
 
         (y0, y1, y2) = MV_encrypt([x1, x2], public_key)
+        # y1 = int(y1) % 256
+        # y2 = int(y2) % 256 
         last_block_x1 = correctBlockSize(y1, 8)
         last_block_x2 = correctBlockSize(y2, 8)
         last_block = int(last_block_x1 + last_block_x2, 2)
         string_block = last_block_x1 + last_block_x2
         Y.append(string_block)
         y0s.append(y0)
+        if last_block > 65535:
+            print("last_block: ", last_block)
+            print("y1: ", y1)
+            print("y2: ", y2)
+
     return Y, y0s
 
     # print(Y)
@@ -104,16 +95,14 @@ def MV_decrypt(Y, secret_key):
 # (quebra uma mensagem grande em blocos e decripta sequencialmente na ordem
 # certa sob o regime CBC - cipher block chaining)
 def CBC_MV_decrypt(big_ciphertext, secret_key, y0s):
-    # big_ciphertext_int = int(big_ciphertext, 16)
     big_ciphertext_bin = big_ciphertext
     length = len(big_ciphertext_bin)
-    # rest = length % 16
+    rest = length % 16
     # if rest != 0:
         # padding = '0'*(16 - rest)
         # big_ciphertext_bin = big_ciphertext_bin + padding 
 
     blocks = [big_ciphertext_bin[i:i+16] for i in range(0, length, 16)]
-
     # last_block = [0,0]
     plain_text = []
     y0s.reverse()
@@ -123,8 +112,8 @@ def CBC_MV_decrypt(big_ciphertext, secret_key, y0s):
     # print("len blocks", len(blocks))
     for i in range(len(blocks) - 1):
         y0 = y0s[i]
-        y1 = int(blocks[i][:8], 2)
-        y2 = int(blocks[i][8:], 2)
+        y1 = int(blocks[i][:8], 2) 
+        y2 = int(blocks[i][8:], 2) 
         X = MV_decrypt([y0, y1, y2], secret_key)
         x1 = correctBlockSize(int(X[0]), 8)
         x2 = correctBlockSize(int(X[1]), 8)
@@ -202,10 +191,9 @@ def write_file_with_nusp(name, random_bytes, nUSP):
 
     return result
 
-def generate_random_bytes():
+def generate_random_bytes(n):
     # Gera 100000 bytes aleatórios e retorna sua representação hexadecimal
-    return os.urandom(100000).hex()
-
+    return os.urandom(n).hex()
 
 def read_file(name):
     # Lê e retorna o texto de um arquivo
@@ -214,6 +202,19 @@ def read_file(name):
     f.close()
 
     return text
+
+def hex_to_bin(hex_string):
+    bin_string = []
+    for char in hex_string:
+        bin_char = bin(int(char, 16))[2:]
+        padding = 8 - len(bin_char)
+        bin_char = '0'*padding + bin_char
+        bin_string.append(bin_char)
+    result = ''.join(bin_string)
+
+    return result
+
+# def bin_to_hex(bin_string):
 
 def main():
     """
@@ -236,28 +237,42 @@ def main():
     alice_keys = MV_keygen(P)
     public_key_alice = alice_keys[0]
     secret_key_alice = alice_keys[1]
-    print("Chave pública de Alice:", public_key_alice)
-    print("Chave secreta de Alice:", secret_key_alice)
+    # print("Chave pública de Alice:", public_key_alice)
+    # print("Chave secreta de Alice:", secret_key_alice)
 
     sum_pr_with_EC_rule = sum_points_with_EC_rule(P, R)
-    print("Soma P+R = ", sum_pr_with_EC_rule)
+    # print("Soma P+R = ", sum_pr_with_EC_rule)
 
     Y = MV_encrypt(R, public_key_alice)
-    print("Criptografando R, Y =", Y)
+    # print("Criptografando R, Y =", Y)
     R = MV_decrypt(Y, secret_key_alice)
-    print("Decriptografando Y, R = ", R)
+    # print("Decriptografando Y, R = ", R)
 
     nusp = '10723944'
-    random_bytes = generate_random_bytes()
+    random_bytes = generate_random_bytes(120)
     write_file_with_nusp('documento1', random_bytes, nusp)
+
+
+    documento1 = read_file('documento1')[:10]
+    # print(len(documento1))
+    # doc1_bin = hex_to_bin(documento1)
+    doc1_bin = bin(int(documento1, 16))[2:]
+    rest = len(doc1_bin) % 16
+    if rest != 0:
+        doc1_bin += '0'*(16-rest) 
+    cipher_text, points_y0s = CBC_MV_encrypt(doc1_bin, public_key_alice)
+    cipher_text = (''.join(cipher_text))
+    # print("Cifrado:", cipher_text)
     
-    # documento1 = read_file('documento1')
-    documento1 = '123456789abcdef'
-    Y, y0s = CBC_MV_encrypt(documento1, public_key_alice)
-    print("Documento encriptado: ",Y)
-    cipher_text = ''.join(Y)
-    X = CBC_MV_decrypt(cipher_text, secret_key_alice, y0s)
-    print("Documento decriptado: ", ''.join(X))
-    print("Texto original: ", bin(int(documento1, 16))[2:])
+    decipher_text = CBC_MV_decrypt(cipher_text, secret_key_alice, points_y0s)
+    decipher_text = ''.join(decipher_text)
+
+    # print("len decipher", len(decipher_text))
+    # original = hex(int(doc1_bin, 2))
+    # decipher = hex(int(decipher_text, 2))
+    print("Original:", doc1_bin)
+    print("Decifrado", decipher_text)
+
+    # print("Hamming:", hamming_distance_with_hex_strings(original, decipher))
 if __name__ == '__main__':
     main()
