@@ -11,10 +11,10 @@ EC = EC.change_ring(GF(PRIME))
 POLY = EC.defining_polynomial()
 
 def MV_keygen(s, P):
-    secret = s % PRIME
-    Q = secret*P
+    s = s % PRIME
+    Q = s*P
     public_key = (Q, P)
-    secret_key = secret
+    secret_key = s
 
     return public_key, secret_key
 
@@ -48,9 +48,9 @@ def correctBlockSize(message, n):
     return message_bin
 
 def CBC_MV_encrypt(big_message_bin, public_key):
-
     length = len(big_message_bin)
     rest = length % 16
+
     if rest != 0:
         padding = '0'*(16 - rest)
         big_message_bin = big_message_bin + padding 
@@ -59,7 +59,6 @@ def CBC_MV_encrypt(big_message_bin, public_key):
     last_block = 0
     Y = []
     y0s = []
-    
     for block in blocks:
         x = int(block, 2).__xor__(last_block)
         x_with_block_size = correctBlockSize(x, 16)
@@ -154,7 +153,7 @@ def hamming_distance_with_hex_strings(h1, h2):
             distance += 1
     return distance
 
-def firstElements(n):
+def first_elements(n):
     P = EC.an_element()
     point_list = []
 
@@ -204,79 +203,137 @@ def hex_to_bin(hex_string):
     return result
 
 # def bin_to_hex(bin_string):
+def print_separator():
+    # Printa hífens do tamanho do terminal para separar as respostas
 
+    rows, columns = os.popen("stty size", "r").read().split()
+    for i in range(int(columns)):
+        print("-", sep="", end="")
 def main():
     """
     Função principal que ordena as chamadas de funções para realizar o que foi
     pedido no EP.
     """
+    print_separator()
 
-    # print(MV_keygen())
+    print("Exercício 1")
+    print("EC = ", EC)
+    print_separator()
+
     P = EC(200, 39)
-    # P = (200, 39, 1)
-    # R = EC(175, 80)
+    print("Exercício 2")
+    print("(200, 39) pertence à curva?", POLY.substitute(x = 200, y = 39, z = 1) == 0)
+    print_separator()
+
+    print("Exercício 3")
+    print("Existem", EC.cardinality(), "pontos na curva")
+    print_separator()
+
+    print("Exercício 4")
+    print("Primeiros 10 pontos na curva: ", first_elements(10))
+    print_separator()
+
+    print("Exercício 5")
+    print("(175, 80) pertence à curva?", POLY.substitute(x = 175, y = 80, z = 1) == 0)
     R = (175, 80, 1)
-    # print("(200, 39) pertence à curva?", POLY.substitute(x = 200, y = 39, z = 1) == 0)
-    # print("Quantidas de de pontos em E:", EC.cardinality())
-    # print("10 primeiros pontos de E:", firstElements(10))
+    print_separator()
 
-    # print("(175, 80) pertence à curva?", POLY.substitute(x = 175, y = 80, z = 1) == 0)  
+    print("Exercício 6")
+    print("Soma P + R: ", sum_points_with_EC_rule(P, R))
+    print_separator()
 
-    # print("P + R = ", P + R)
-    alice_keys = MV_keygen(10723944, P)
-    public_key_alice = alice_keys[0]
-    secret_key_alice = alice_keys[1]
-    # print("Chave pública de Alice:", public_key_alice)
-    # print("Chave secreta de Alice:", secret_key_alice)
+    print("Exercício 7")
+    s = 10723944 % PRIME
+    print("s = 10723944 % 263 =", s)
+    print_separator()
 
-    sum_pr_with_EC_rule = sum_points_with_EC_rule(P, R)
-    # print("Soma P+R = ", sum_pr_with_EC_rule)
+    print("Exercício 8")
+    public_key_alice, secret_key_alice = MV_keygen(s, P)
+    print("Q = sP =", public_key_alice[0])
+    print_separator()
 
+    print("Exercício 9")
     Y = MV_encrypt(R, public_key_alice)
-    # print("Criptografando R, Y =", Y)
-    R = MV_decrypt(Y, secret_key_alice)
-    # print("Decriptografando Y, R = ", R)
+    print("Y = (y0, y1, y2) = ", Y)
+    print_separator()
 
+    print("Exercício 10")
+    decipher_Y = MV_decrypt(Y, secret_key_alice)
+    print("Decifração de Y:", decipher_Y)
+    print_separator()
+
+    if(decipher_Y[0] != R[0] or decipher_Y[1] != R[1]):
+        print("ERROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+        exit(-10)
+
+    print("Exercício 11")
     nusp = '10723944'
-    n = 4096
-    random_bytes = generate_random_bytes(100)
+    n = 10000
+    random_bytes = generate_random_bytes(n)
     write_file_with_nusp('documento1', random_bytes, nusp)
-
     documento1 = read_file('documento1')
-    doc1_bin = get_binary_representation_512_bits_of_hex(documento1[:n])
-    cipher_text, points_y0s = CBC_MV_encrypt(doc1_bin[:n], public_key_alice)
-    cipher_text = (''.join(cipher_text))
-    decipher_text = CBC_MV_decrypt(cipher_text, secret_key_alice, points_y0s)
-    decipher_text = ''.join(decipher_text)
-    original = hex(int(doc1_bin[:n], 2))
-    doc1_cript_inverso = hex(int(decipher_text, 2))
-    doc1_cript = hex(int(cipher_text, 2))
-    # 13
-    # print("Decriptografando doc1-cript: ", doc1_cript_inverso)
-    # 14
-    # print("Distância de Hamming entre doc1-cript e doc1-cript-inverso:", hamming_distance_with_hex_strings(doc1_cript, doc1_cript_inverso))
+    print("Primeiros 100 bytes de documento1: ", documento1[:200])
+    print_separator()
+
+    print("Exercício 12")
+    doc1_bin = bin(int(documento1, 16))[2:]
+    doc1_cript, points_y0 = CBC_MV_encrypt(doc1_bin, public_key_alice)
+    doc1_cript = (''.join(doc1_cript))
+    print("doc1_cript: ", doc1_cript[:800])
+
+    print("Exercício 13")
+    doc1_cript_inverso = CBC_MV_decrypt(doc1_cript[:800], secret_key_alice, points_y0)
+    doc1_cript_inverso = ''.join(doc1_cript_inverso)
+    print("doc1_cript_inveso:", doc1_cript_inverso)
+    print_separator()
+
+    # original = hex(int(doc1_bin[:n], 2))
+    print("Exercício 14")
+    doc1_cript_inverso = hex(int(doc1_cript_inverso, 2))
+    doc1_cript = hex(int(doc1_cript, 2))
+    print("Distância de Hamming entre doc1_cript_inverso e doc1_cript: ", hamming_distance_with_hex_strings(doc1_cript, doc1_cript_inverso))
+    print_separator()
 
     # 15
+    print("Exercício 15")
     nusp = '20723944'
     write_file_with_nusp('documento2', random_bytes, nusp)
     documento2 = read_file('documento2')
     doc2_bin = bin(int(documento2, 16))[2:]
+    print("Primeiros 100 bytes de documento2:", documento2[:200])
+    print_separator()
+
     # 16
-    doc2_cript, points_y0s = CBC_MV_encrypt(doc2_bin, public_key_alice)
+    print("Exercício 16")
+    doc2_cript, points_y0 = CBC_MV_encrypt(doc2_bin, public_key_alice)
     doc2_cript = ''.join(doc2_cript)
-    print("doc2_cript: ", doc2_cript[:100])
+    print("doc2_cript: ", doc2_cript[:800])
+    print_separator()
 
     #17
+    print("Exercício 17")
     doc2_cript = hex(int(doc2_cript, 2))
     print("Distância de Hamming entre doc1_cript e doc2_cript", hamming_distance_with_hex_strings(doc2_cript, doc1_cript))
+    print_separator()
 
     #18
-    secret_key_beto, public_key_beto = MV_keygen(99999999, P)
+    print("Exercício 18")
+    public_key_beto, secret_key_beto = MV_keygen(99999999, P)
     print("Chaves de beto:", secret_key_beto, public_key_beto)
+    print_separator()
 
     #19
-    # cipher_text, points_y0s = CBC_MV_encrypt(doc1_bin, public_key_beto)
-    # print("Texto cifrado por beto:", cipher_text)
+    print("Exercício 19")
+    doc1_cript_beto, points_y0 = CBC_MV_encrypt(doc1_bin, public_key_beto)
+    doc1_cript_beto = ''.join(doc1_cript_beto)
+    print("Texto cifrado por beto:", doc1_cript_beto[:800])
+    print_separator()
+
+    # 20
+    print("Exercício 20")
+    doc1_cript_beto_hex = hex(int(doc1_cript_beto[:800], 12))
+    print("Distância de Hamming entre doc1-cript e doc1-cript-beto")
+    print_separator()
 
 if __name__ == '__main__':
     main()
